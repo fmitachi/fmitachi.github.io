@@ -24,7 +24,7 @@ Chain:  Observable被触发之后的代码逻辑执行路径。
 
 那么RxJava中如何创建Observable和Subscriber呢？
 
-'''java
+```java
     Observable.create(new Observable.OnSubscribe<String>() {
         @Override
         public void call(Subscriber<? super String> subscriber) {
@@ -32,7 +32,7 @@ Chain:  Observable被触发之后的代码逻辑执行路径。
             subscriber.onCompleted();
         }
     }).
-'''
+```
 
 ##3.操作##
 
