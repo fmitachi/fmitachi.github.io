@@ -34,6 +34,7 @@ Observable.create(new Observable.OnSubscribe<String>() {
 });
 ```
 在上面的代码中，创建了一个**可被订阅者**，其执行的逻辑是像其订阅者传递一个"HelloWorld"字符串。那继续看Observable.create的源码:
+
 ```java
 public final static <T> Observable<T> create(OnSubscribe<T> f) {
     return new Observable<T>(hook.onCreate(f));
