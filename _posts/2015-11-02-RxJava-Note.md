@@ -22,17 +22,29 @@ Chain:  Observable被触发之后的代码逻辑执行路径。
 
 订阅者和被订阅者属于观察者模式中的两大核心概念，被订阅者产生事件，订阅者处理事件，事件的触发往往由第三方完成。在RxJava中两者不在局限于狭义的事件，其处理的可以使任何一段代码逻辑，触发"事件"的行为往往由**订阅**完成。
 
-那么RxJava中如何创建Observable和Subscriber呢？
+那么RxJava中如何创建Observable和Subscriber呢？先上代码:
 
 ```java
-    Observable.create(new Observable.OnSubscribe<String>() {
-        @Override
-        public void call(Subscriber<? super String> subscriber) {
-            subscriber.onNext("HelloWorld");
-            subscriber.onCompleted();
-        }
-    }).
+Observable.create(new Observable.OnSubscribe<String>() {
+    @Override
+    public void call(Subscriber<? super String> subscriber) {
+        subscriber.onNext("HelloWorld");
+        subscriber.onCompleted();
+    }
+});
 ```
+在上面的代码中，创建了一个**可被订阅者**，其执行的逻辑是像其订阅者传递一个"HelloWorld"字符串。那继续看Observable.create的源码:
+```java
+public final static <T> Observable<T> create(OnSubscribe<T> f) {
+    return new Observable<T>(hook.onCreate(f));
+}
+```
+
+create方法接受一个OnSubscribe类型的参数，顾名思义该参数表示当**订阅**行为发生时执行的操作，返回一个Observable对象。
+
+*hook*:用于对**被订阅者**的生命周期进行拦截处理，默认hook不进行任何处理，代码详见RxJavaObservableExecutionHookDefault.java
+
+继续看Observable的构造函数
 
 ##3.操作##
 
