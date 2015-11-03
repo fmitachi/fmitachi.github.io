@@ -8,9 +8,9 @@ title: RxJava源码浅析
 ##1.概念##
 本文中会涉及到一些自定义的概念，先列在前面。
 
-Observable: 可被订阅者
+Observable: 可被订阅者（缩写OB）
 
-Subscriber: 订阅者
+Subscriber: 订阅者（缩写SUB）
 
 订阅: Observable.subscribe函数或者类似于该函数的行为。
 
@@ -96,7 +96,7 @@ Subscribe函数中会先调用onStart，然后转换为SafeSubscriber,并作为�
 至此为止RxJava的一次简单使用已经完成，但是然并卵，这种特性和直接使用Callback并没有多大差别，那么RxJava的NB之处怎么体现呢？这就需要进入下一个主题，**操作**
 
 ##3.操作##
-在上面的例子中Observer产生了一个Message（“HelloWorld”）,Subscriber对Message的处理方式就是把其打印出来，那么如果我们需要对Message进行加工呢？祭出神器**map**。
+在上面的例子中Observer产生了一个Message（“HelloWorld”）,Subscriber对Message的处理方式就是把其打印出来，如果我们需要对Message进行加工怎么处理呢？这就需要用到神器**map**。
 
 ```java
 	Observable.create(new Observable.OnSubscribe<String>() {
@@ -129,13 +129,9 @@ Subscribe函数中会先调用onStart，然后转换为SafeSubscriber,并作为�
                 try {
                     Subscriber<? super T> st = hook.onLift(operator).call(o);
                     try {
-                        // new Subscriber created and being subscribed with so 'onStart' it
                         st.onStart();
                         onSubscribe.call(st);
                     } catch (Throwable e) {
-                        // localized capture of errors rather than it skipping all operators
-                        // and ending up in the try/catch of the subscribe method which then
-                        // prevents onErrorResumeNext and other similar approaches to error handling
                         if (e instanceof OnErrorNotImplementedException) {
                             throw (OnErrorNotImplementedException) e;
                         }
@@ -145,8 +141,6 @@ Subscribe函数中会先调用onStart，然后转换为SafeSubscriber,并作为�
                     if (e instanceof OnErrorNotImplementedException) {
                         throw (OnErrorNotImplementedException) e;
                     }
-                    // if the lift function failed all we can do is pass the error to the final Subscriber
-                    // as we don't have the operator available to us
                     o.onError(e);
                 }
             }
@@ -154,10 +148,7 @@ Subscribe函数中会先调用onStart，然后转换为SafeSubscriber,并作为�
     }
 ```
 
-此处出现了RxJava中比较核心的概念，lift, 其返回了一个新的Observable对象（为方便区分, 新的Observable对象命名为OBNew， create接口返回的Observable对象命名为OBOld），也就意味着，我们最终的订阅者是订阅OBNew的，按之前的理解，当subscribe行为发生时，会触发执行Observable.onSubscribe的call函数，即上图中的call函数。注意此处的call中的参数o，使我们在subscribe函数中创建的Subscriber对象(命名为SubOld)上面的代码中先调用operator的call函数，传递SubOld获取一个Subscriber对象SubNew，那SubNew和SubOld是啥关系呢？我们先看Operator的类型，
-
-在map函数中，先用我们创建的转换函数func1构建了OperatorMap,然后调用lift，
-此处的operator的实际类型为OperatorMap,那我们的目标转移到OperatorMap的call函数。
+此处出现了RxJava中比较核心的概念，lift, 其返回了一个新的Observable对象，为方便区分, 新的Observable对象称之为OB’， create接口返回的Observable对象命名为OB，也就意味着，我们最终的订阅者是订阅OB‘的，按之前的理解，当subscribe行为发生时，会触发执行Observable.onSubscribe的call函数，即上面代码中的call函数。***注意此处的call中的参数o，使我们在subscribe函数中创建的Subscriber对象(命名为SUB)***上面的代码中先调用operator的call函数，传递SUB获取一个Subscriber对象SUB’，那SUB‘和SUB是啥关系呢？我们先看Operator的类型，在map函数中，先用我们创建的转换函数Func1构建了OperatorMap,然后调用lift，此处的operator的实际类型为OperatorMap,所以我们的目标转移到OperatorMap的call函数。
 
 ```java
 public final class OperatorMap<T, R> implements Operator<R, T> {
@@ -197,22 +188,20 @@ public final class OperatorMap<T, R> implements Operator<R, T> {
 
 }
 ```
-注意此处创建了SubNew，当SubNew被通知时（onNext），先调用转换函数，进行处理，然后处理的结果通知给SubOld。
+***注意此处创建了SUB’，当SUB‘被通知时（onNext被调用），先调用转换函数Func1进行处理，然后将处理的结果通知给SUB。***
 
-回到lift的代码中，获取SubNew之后，调用OBOld的onSubscribe的call函数，并传递了SubNew。对比subscribe函数，此处即触发了对OBOld的一次“订阅行为”，即用SubNew订阅OBOld。综上，最终的执行路线如下
+回到lift的代码中，获取SUB’之后，调用OB的onSubscribe的call函数，并传递了SUB‘。对比subscribe函数，此处即触发了对OB的一次“订阅行为”，即用SUB’订阅OB。综上，最终的执行路线如下:
 
-subscribe（SubOld）->OBNew.onSubscribe.call->OBOld.onSubscribe.call->SubNew.onNext->Func1->SubOld.onNext
+
+OB’(subscribe)——>OB’(onSubscribe.call)——>OB(onSubscribe.call)——>SUB’(onNext)——>Func1——>SB(onNext)
 
 OB<—>SUB
 OBOld——>SubNew——>FUNC1——>SUBOld—>OBNew
 
-即map操作生成了一对代理OBProxy/SubProxy,
-OBProxy用于接受真正的订阅，SubProxy用于监听原本被观察者的事件。
+即map操作生成了一对代理OBProxy/SUBProxy,OBProxy用于接受真正的订阅，SUBProxy用于监听原本被观察者的事件。
+下面我们扩展到两个map的情况，每一次map操作会产生一个新的OB和新的Sub。
 
-下面我们扩展到两个map的情况，每一次map操作会产生一个新的OB和新的Sub，故此处命名
-为OBOLD SUBOLD  OB1 SUB1 OB2 SUB2
-OB2——>OB1
-
+```java
 	Observable.create(new Observable.OnSubscribe<String>() {
             @Override
             public void call(Subscriber<? super String> subscriber) {
@@ -233,12 +222,14 @@ OB2——>OB1
             ...省略代码...
         });
 
-SUBOLD——>OB2——>OB1——>OBOLD——>SUB1——>FUNC1——>SUB2——>FUNC2——>SUBOLD
+```
+其执行流程如下：
+
+SUB——>OB’’——>OB’——>OB——>SUB’——>FUNC1——>SUB’’——>FUN2——>SUB
 
 
 ##4.异步##
-搞定了operator和lift之后，再来看线程调度就比较简单了，RxJava中的线程调度主要依赖于Scheduler完成，其默认提供三种Scheduler。。。。
-那如何将指定的operator放到特定的线程池中执行呢？RxJava提供两种方式：observerOn和subscribeOn,我们先看observerOn。
+搞定了operator和lift之后，再来看线程调度就比较简单了，RxJava中的线程调度主要依赖于Scheduler完成。那如何将指定的operator放到特定的线程池中执行呢？RxJava提供两种方式：**observerOn**和**subscribeOn**,先看observerOn。
 
 ```java
     public final Observable<T> observeOn(Scheduler scheduler) {
@@ -248,7 +239,7 @@ SUBOLD——>OB2——>OB1——>OBOLD——>SUB1——>FUNC1——>SUB2——>F
         return lift(new OperatorObserveOn<T>(scheduler));
     }
 ```
-其逻辑和普通的map操作一致，由此可知，线程调度相关的工作应由OperatorObserveOn.call返回的SubProxy控制
+其逻辑和普通的map操作一致，由此可知，线程调度相关的工作应由OperatorObserveOn.call返回的SUBProxy控制
 
 ```java
     public Subscriber<? super T> call(Subscriber<? super T> child) {
@@ -265,7 +256,7 @@ SUBOLD——>OB2——>OB1——>OBOLD——>SUB1——>FUNC1——>SUB2——>F
         }
     }
 ```
-此处返回的SubProxy是ObserveOnSubscriber
+此处返回的SUBProxy是ObserveOnSubscriber
 
 ```java
 	 @Override
@@ -281,7 +272,7 @@ SUBOLD——>OB2——>OB1——>OBOLD——>SUB1——>FUNC1——>SUB2——>F
         }
 ```
 
-在其onNext中果然发现了我们的目标schedule函数。
+在其onNext中果然发现了目标schedule函数。
 
 ```java
 	protected void schedule() {
@@ -306,7 +297,7 @@ schedule的任务又传递给了recursiveScheduler,这个是怎么乱入的，ac
         }
 ```
 
-***注意此处的child即为SubOld***
+***注意此处的child即为SUB***
 
 recursiveScheduler是通过最外层选择的Scheduler创建出来的，so...
 
@@ -389,7 +380,9 @@ public final class NewThreadScheduler extends Scheduler {
         }
     }
 ```
-至此，又回到了SubOld上，唯一的区别就是SubOld.onNext是在线程池中执行，而非创建SubOld的线程中执行。值得注意的是，一旦执行一次observerOn之后，后续的逻辑都是在Scheduler指定的线程上运行的，知道再次调用observerOn或则流程运行结束。SUBOLD——>OB1——>OBOLD——>SUB1—>SUBOLD
+至此，又回到了SUB上，唯一的区别就是SUB.onNext是在线程池中执行，而非创建SUB的线程中执行。值得注意的是，一旦执行一次observerOn之后，后续的逻辑都是在Scheduler指定的线程上运行的，直到再次调用observerOn或则流程运行结束。
+
+SUB——>OB‘——>OB——>SUB’线程切换——>SUB
 
 另外一种线程调度的方式是subscribeOn，那subscribeOn是 怎么执行的呢？它和observerOn有什么区别呢？
 继续上源码
@@ -416,7 +409,7 @@ public final class NewThreadScheduler extends Scheduler {
 
 ```
 
-同样nest创建了一个OBNew,只是其类型是ScalarSynchronousObservable，并且把OBOld作为参数传递给构造函数
+同样nest创建了一个OB‘,只是其类型是ScalarSynchronousObservable，并且把OB作为参数传递给构造函数
 
 ```java
     protected ScalarSynchronousObservable(final T t) {
@@ -433,7 +426,7 @@ public final class NewThreadScheduler extends Scheduler {
     }
 ```
 
-在ScalarSynchronousObservable中创建了OBNew,当OBNew“被订阅”的时候，把OBOld作为参数传递给了OBNew的订阅者，那OBNew的订阅者是谁呢？会是我们创建的SubOld么？答案是否定的，因为SubOld的onNext不能接受Observable类型的参数。回顾之前lift函数中会产生一次订阅操作，那么此处的订阅者应该是lift中从operator获取的SubNew，那OperatorSubscribeOn会生成一个怎样的订阅者呢？
+在ScalarSynchronousObservable中创建了OB’,当OB‘**被订阅**的时候，把OB作为参数传递给了OB’的订阅者，那OB‘的订阅者是谁呢？会是外层创建的SUB么？答案是否定的，因为SUB的onNext不能接受Observable类型的参数。回顾之前lift函数中会产生一次订阅操作，那么此处的订阅者应该是lift中从operator获取的SUB’，那OperatorSubscribeOn会生成一个怎样的订阅者呢？
 
 ```java
 public Subscriber<? super Observable<T>> call(final Subscriber<? super T> subscriber) {
@@ -508,9 +501,11 @@ public Subscriber<? super Observable<T>> call(final Subscriber<? super T> subscr
     }
 ```
 
-注意SubNew的onNext函数，会先执行线程切换，然后对OBOld进行订阅操作，并在其订阅者的onNext中把结果传递给SubOld，从而回到逻辑链上。
-综上，执行流程为：
-SUBOLD——>OB2——>OB1——>SUB2——>OBOLD——>SUB1—>SUBOLD对比两种方式的执行流程，前者在啊切换线程之后所有的订阅行为已经发生，在执行通知的过程中切换线程，后者则是切换线程后发生对OBOLD的订阅然后进入通知链。
-所以对于前者每执行一次，其后续的通知链切换到另一条线程上执行，但是由于订阅行为已经发生，故其无法指定OBOLD的执行线程;而对于后者，由于其线程切换发生在OBOLD的订阅执行之前，所以其可以指定给OBOLD指定线程，但是无论调用多少次，只有第一次会生效。
+注意SUB‘的onNext函数，会先执行线程切换，然后对OB进行订阅操作，并在其订阅者的onNext中把结果传递给SUB，从而回到**Chain**上。综上，执行流程为：
+
+SUB——>OB’‘——>OB’——>SUB‘’——>OB——>SUB‘—>SUB
+
+对比两种方式的执行流程，observerOn在切换线程之前所有的订阅行为已经发生，在执行**Chain**的过程中切换线程，subscribeOn则是切换线程后发生对OB的订阅从而进入**Chain**。所以对于observerOn每执行一次，其后续的Chain切换到另一条线程上执行，但是由于订阅行为已经发生，故其无法指定OB的执行线程;而对于后者，由于其线程切换发生在OB的订阅执行之前，所以其可以指定给OB指定线程，但是无论调用多少次，只有第一次会生效。
+
 ##5.结语##
-本文知识对rxjava源码的匆匆一瞥，在实际的项目应用中，可以根据自己的需求选择一些封装库，RXBus等
+本文知识对RxJava源码的匆匆一瞥，在实际的项目应用中，可以根据自己的需求选择一些封装库，RxBinding等,另外还有诸如flatMap、contactMap以及剩余几种Scheduler的原理，大家可以自行分析源码。
