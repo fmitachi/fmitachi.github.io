@@ -193,7 +193,7 @@ public final class OperatorMap<T, R> implements Operator<R, T> {
 回到lift的代码中，获取SUB’之后，调用OB的onSubscribe的call函数，并传递了SUB‘。对比subscribe函数，此处即触发了对OB的一次“订阅行为”，即用SUB’订阅OB。综上，最终的执行路线如下:
 
 
-![](http://fmitachi.github.io/images/1.png “流程1”)
+![流程1](http://fmitachi.github.io/images/1.png)
 
 不带操作的订阅流程
 
