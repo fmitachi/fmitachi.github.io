@@ -503,7 +503,7 @@ public Subscriber<? super Observable<T>> call(final Subscriber<? super T> subscr
 
 注意SUB‘的onNext函数，会先执行线程切换，然后对OB进行订阅操作，并在其订阅者的onNext中把结果传递给SUB，从而回到**Chain**上。综上，执行流程为：
 
-SUB——>OB’‘——>OB’——>SUB‘’——>OB——>SUB‘—>SUB
+SUB——>OB’’——>OB’——>SUB’’——>OB——>SUB’—>SUB
 
 对比两种方式的执行流程，observerOn在切换线程之前所有的订阅行为已经发生，在执行**Chain**的过程中切换线程，subscribeOn则是切换线程后发生对OB的订阅从而进入**Chain**。所以对于observerOn每执行一次，其后续的Chain切换到另一条线程上执行，但是由于订阅行为已经发生，故其无法指定OB的执行线程;而对于后者，由于其线程切换发生在OB的订阅执行之前，所以其可以指定给OB指定线程，但是无论调用多少次，只有第一次会生效。
 
