@@ -193,10 +193,15 @@ public final class OperatorMap<T, R> implements Operator<R, T> {
 回到lift的代码中，获取SUB’之后，调用OB的onSubscribe的call函数，并传递了SUB‘。对比subscribe函数，此处即触发了对OB的一次“订阅行为”，即用SUB’订阅OB。综上，最终的执行路线如下:
 
 
-OB’(subscribe)——>OB’(onSubscribe.call)——>OB(onSubscribe.call)——>SUB’(onNext)——>Func1——>SB(onNext)
+![流程1](http://fmitachi.github.io/images/1.png “流程1”)
 
-OB<—>SUB
-OBOld——>SubNew——>FUNC1——>SUBOld—>OBNew
+不带操作的订阅流程
+
+![流程2](http://fmitachi.github.io/images/2.png “流程2”)
+
+使用map之后的执行流程
+
+![流程3](http://fmitachi.github.io/images/3.png “流程3”)
 
 即map操作生成了一对代理OBProxy/SUBProxy,OBProxy用于接受真正的订阅，SUBProxy用于监听原本被观察者的事件。
 下面我们扩展到两个map的情况，每一次map操作会产生一个新的OB和新的Sub。
@@ -225,7 +230,7 @@ OBOld——>SubNew——>FUNC1——>SUBOld—>OBNew
 ```
 其执行流程如下：
 
-SUB——>OB’’——>OB’——>OB——>SUB’——>FUNC1——>SUB’’——>FUN2——>SUB
+![流程4](http://fmitachi.github.io/images/4.png “流程4”)
 
 
 ##4.异步##
@@ -382,7 +387,7 @@ public final class NewThreadScheduler extends Scheduler {
 ```
 至此，又回到了SUB上，唯一的区别就是SUB.onNext是在线程池中执行，而非创建SUB的线程中执行。值得注意的是，一旦执行一次observerOn之后，后续的逻辑都是在Scheduler指定的线程上运行的，直到再次调用observerOn或则流程运行结束。
 
-SUB——>OB‘——>OB——>SUB’线程切换——>SUB
+![流程5](http://fmitachi.github.io/images/5.png “流程5”)
 
 另外一种线程调度的方式是subscribeOn，那subscribeOn是 怎么执行的呢？它和observerOn有什么区别呢？
 继续上源码
@@ -503,7 +508,7 @@ public Subscriber<? super Observable<T>> call(final Subscriber<? super T> subscr
 
 注意SUB‘的onNext函数，会先执行线程切换，然后对OB进行订阅操作，并在其订阅者的onNext中把结果传递给SUB，从而回到**Chain**上。综上，执行流程为：
 
-SUB——>OB’’——>OB’——>SUB’’——>OB——>SUB’—>SUB
+![流程6](http://fmitachi.github.io/images/6.png “流程6”)
 
 对比两种方式的执行流程，observerOn在切换线程之前所有的订阅行为已经发生，在执行**Chain**的过程中切换线程，subscribeOn则是切换线程后发生对OB的订阅从而进入**Chain**。所以对于observerOn每执行一次，其后续的Chain切换到另一条线程上执行，但是由于订阅行为已经发生，故其无法指定OB的执行线程;而对于后者，由于其线程切换发生在OB的订阅执行之前，所以其可以指定给OB指定线程，但是无论调用多少次，只有第一次会生效。
 
