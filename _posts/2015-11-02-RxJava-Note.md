@@ -33,7 +33,7 @@ Observable.create(new Observable.OnSubscribe<String>() {
     }
 });
 ```
-在上面的代码中，创建了一个**可被订阅者**，其执行的逻辑是像其订阅者传递一个"HelloWorld"字符串。那继续看Observable.create的源码:
+在上面的代码中，创建了一个**可被订阅者**，其执行的逻辑是向其订阅者传递一个"HelloWorld"字符串。那继续看Observable.create的源码:
 
 ```java
 public final static <T> Observable<T> create(OnSubscribe<T> f) {
@@ -43,7 +43,7 @@ public final static <T> Observable<T> create(OnSubscribe<T> f) {
 
 create方法接受一个OnSubscribe类型的参数，顾名思义该参数表示当**订阅**行为发生时执行的操作，返回一个Observable对象。
 
-*hook:用于对**被订阅者**的生命周期进行拦截处理，默认hook不进行任何处理，代码详见RxJavaObservableExecutionHookDefault.java*
+*hook:用于对**被订阅者**的生命周期进行拦截处理，默认hook不进行任何处理，代码详见RxJavaObservableExecutionHookDefault.java*。
 
 继续看Observable的构造函数
 
@@ -53,7 +53,7 @@ protected Observable(OnSubscribe<T> f) {
 }
 ```
 
-在Observable的构造函数中，只是简单地存储了onSubscribe对象。至此一个**可被订阅者**就创建完成了。有了Observable对象之后就可以开始**订阅**行为了
+在Observable的构造函数中，只是简单地存储了onSubscribe对象。至此一个**可被订阅者**就创建完成了。有了Observable对象之后就可以开始**订阅**行为了。
 
 ```java
 Observable.create(new Observable.OnSubscribe<String>() {
@@ -72,7 +72,7 @@ Observable.create(new Observable.OnSubscribe<String>() {
     }});
 ```
 
-当执行**订阅**操作时，需要传递一个Subscriber对象，对于接收和处理Observable产生的"事件"。
+当执行**订阅**操作时，需要传递一个Subscriber对象，用于接收和处理Observable产生的"事件"。
 
 ```java
 private static <T> Subscription subscribe(Subscriber<? super T> subscriber, Observable<T> observable) {
@@ -91,7 +91,7 @@ private static <T> Subscription subscribe(Subscriber<? super T> subscriber, Obse
 }
 ```
 
-Subscribe函数中会先调用onStart，然后转换为SafeSubscriber,并作为参数传递给onSubscribe的call函数，并传递Subscriber,对象，此处的onSubscribe即是create函数中new的onSubscribe，所以当其执行call函数时，自然调用到订阅者的onNext。
+subscribe函数中会先调用onStart，然后转换为SafeSubscriber,作为参数传递给onSubscribe的call函数，并传递Subscriber对象，此处的onSubscribe即是create函数中new的onSubscribe，所以当其执行call函数时，自然调用到订阅者的onNext。
 
 至此为止RxJava的一次简单使用已经完成，但是然并卵，这种特性和直接使用Callback并没有多大差别，那么RxJava的NB之处怎么体现呢？这就需要进入下一个主题，**操作**
 
@@ -148,7 +148,7 @@ Subscribe函数中会先调用onStart，然后转换为SafeSubscriber,并作为�
     }
 ```
 
-此处出现了RxJava中比较核心的概念，lift, 其返回了一个新的Observable对象，为方便区分, 新的Observable对象称之为OB’， create接口返回的Observable对象命名为OB，也就意味着，我们最终的订阅者是订阅OB‘的，按之前的理解，当subscribe行为发生时，会触发执行Observable.onSubscribe的call函数，即上面代码中的call函数。***注意此处的call中的参数o，使我们在subscribe函数中创建的Subscriber对象(命名为SUB)***上面的代码中先调用operator的call函数，传递SUB获取一个Subscriber对象SUB’，那SUB‘和SUB是啥关系呢？我们先看Operator的类型，在map函数中，先用我们创建的转换函数Func1构建了OperatorMap,然后调用lift，此处的operator的实际类型为OperatorMap,所以我们的目标转移到OperatorMap的call函数。
+此处出现了RxJava中比较核心的一个概念，lift, 其返回了一个新的Observable对象，为方便区分, 新的Observable对象称之为OB’， create接口返回的Observable对象命名为OB，也就意味着，我们最终的订阅者是订阅OB‘的，按之前的理解，当subscribe行为发生时，会触发执行Observable.onSubscribe的call函数，即上面代码中的call函数。***注意此处的call中的参数o，是我们在subscribe函数中创建的Subscriber对象(命名为SUB)***上面的代码中先调用operator的call函数，传递SUB获取一个新的Subscriber对象SUB’，那SUB‘和SUB是啥关系呢？我们先看Operator的类型，在map函数中，先用我们创建的转换函数Func1构建了OperatorMap,然后调用lift，此处的operator的实际类型为OperatorMap,所以我们的目标转移到OperatorMap的call函数。
 
 ```java
 public final class OperatorMap<T, R> implements Operator<R, T> {
@@ -513,4 +513,4 @@ public Subscriber<? super Observable<T>> call(final Subscriber<? super T> subscr
 对比两种方式的执行流程，observerOn在切换线程之前所有的订阅行为已经发生，在执行**Chain**的过程中切换线程，subscribeOn则是切换线程后发生对OB的订阅从而进入**Chain**。所以对于observerOn每执行一次，其后续的Chain切换到另一条线程上执行，但是由于订阅行为已经发生，故其无法指定OB的执行线程;而对于后者，由于其线程切换发生在OB的订阅执行之前，所以其可以指定给OB指定线程，但是无论调用多少次，只有第一次会生效。
 
 ##5.结语##
-本文只是对RxJava源码的匆匆一瞥，在实际的项目应用中，可以根据自己的需求选择一些封装库，RxBinding等,另外还有诸如flatMap、contactMap以及剩余几种Scheduler的原理，大家可以自行分析源码。
+本文只是对RxJava源码的匆匆一瞥，在实际的项目应用中，可以根据自己的需求选择一些封装库，RxBinding等,另外还有诸如flatMap、contactMap、Subject以及剩余几种Scheduler的原理，大家可以自行分析源码。
