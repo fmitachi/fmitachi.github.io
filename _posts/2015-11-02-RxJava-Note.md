@@ -204,7 +204,7 @@ public final class OperatorMap<T, R> implements Operator<R, T> {
 ![流程3](http://fmitachi.github.io/images/3.png)
 
 即map操作生成了一对代理OBProxy/SUBProxy,OBProxy用于接受真正的订阅，SUBProxy用于监听原本被观察者的事件。
-下面我们扩展到两个map的情况，每一次map操作会产生一个新的OB和新的Sub。
+下面我们扩展到两个map的情况，每一次map操作会产生一个新的OB和新的SUB。
 
 ```java
 	Observable.create(new Observable.OnSubscribe<String>() {
@@ -513,4 +513,4 @@ public Subscriber<? super Observable<T>> call(final Subscriber<? super T> subscr
 对比两种方式的执行流程，observerOn在切换线程之前所有的订阅行为已经发生，在执行**Chain**的过程中切换线程，subscribeOn则是切换线程后发生对OB的订阅从而进入**Chain**。所以对于observerOn每执行一次，其后续的Chain切换到另一条线程上执行，但是由于订阅行为已经发生，故其无法指定OB的执行线程;而对于后者，由于其线程切换发生在OB的订阅执行之前，所以其可以指定给OB指定线程，但是无论调用多少次，只有第一次会生效。
 
 ##5.结语##
-本文知识对RxJava源码的匆匆一瞥，在实际的项目应用中，可以根据自己的需求选择一些封装库，RxBinding等,另外还有诸如flatMap、contactMap以及剩余几种Scheduler的原理，大家可以自行分析源码。
+本文只是对RxJava源码的匆匆一瞥，在实际的项目应用中，可以根据自己的需求选择一些封装库，RxBinding等,另外还有诸如flatMap、contactMap以及剩余几种Scheduler的原理，大家可以自行分析源码。
