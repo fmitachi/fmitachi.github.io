@@ -15,10 +15,13 @@
       <pubDate>Wed, 16 Mar 2016 15:54:44 +0800</pubDate>
       
       <guid>http://fmitachi.github.io/2015-11-02-RxJava-Note.html</guid>
-      <description>&lt;p&gt;最近项目中准备引入RxJava库，研究了一下源码，目前还没有正式投入使用，文中如有纰漏的地方，欢迎各位大神指正。&lt;/p&gt;
+      <description>
 
-&lt;p&gt;##1.概念##
-本文中会涉及到一些自定义的概念，先列在前面。&lt;/p&gt;
+&lt;p&gt;最近项目中准备引入RxJava库，研究了一下源码，目前还没有正式投入使用，文中如有纰漏的地方，欢迎各位大神指正。&lt;/p&gt;
+
+&lt;h2 id=&#34;1-概念:b9472339406d06d16f9e17bdab169b30&#34;&gt;1.概念&lt;/h2&gt;
+
+&lt;p&gt;本文中会涉及到一些自定义的概念，先列在前面。&lt;/p&gt;
 
 &lt;p&gt;Observable: 可被订阅者（缩写OB）&lt;/p&gt;
 
@@ -30,7 +33,7 @@
 
 &lt;p&gt;操作: Observable被触发之后到订阅者处理之前所经历的变换（lift）。&lt;/p&gt;
 
-&lt;p&gt;##2.订阅者VS被订阅者##&lt;/p&gt;
+&lt;h2 id=&#34;2-订阅者vs被订阅者:b9472339406d06d16f9e17bdab169b30&#34;&gt;2.订阅者VS被订阅者&lt;/h2&gt;
 
 &lt;p&gt;订阅者和被订阅者属于观察者模式中的两大核心概念，被订阅者产生事件，订阅者处理事件，事件的触发往往由第三方完成。在RxJava中两者不在局限于狭义的事件，其处理的可以使任何一段代码逻辑，触发&amp;rdquo;事件&amp;rdquo;的行为往往由&lt;strong&gt;订阅&lt;/strong&gt;完成。&lt;/p&gt;
 
@@ -103,8 +106,9 @@
 
 &lt;p&gt;至此为止RxJava的一次简单使用已经完成，但是然并卵，这种特性和直接使用Callback并没有多大差别，那么RxJava的NB之处怎么体现呢？这就需要进入下一个主题，&lt;strong&gt;操作&lt;/strong&gt;&lt;/p&gt;
 
-&lt;p&gt;##3.操作##
-在上面的例子中Observer产生了一个Message（“HelloWorld”）,Subscriber对Message的处理方式就是把其打印出来，如果我们需要对Message进行加工怎么处理呢？这就需要用到神器&lt;strong&gt;map&lt;/strong&gt;。&lt;/p&gt;
+&lt;h2 id=&#34;3-操作:b9472339406d06d16f9e17bdab169b30&#34;&gt;3.操作&lt;/h2&gt;
+
+&lt;p&gt;在上面的例子中Observer产生了一个Message（“HelloWorld”）,Subscriber对Message的处理方式就是把其打印出来，如果我们需要对Message进行加工怎么处理呢？这就需要用到神器&lt;strong&gt;map&lt;/strong&gt;。&lt;/p&gt;
 
 &lt;pre&gt;&lt;code class=&#34;language-java&#34;&gt;	Observable.create(new Observable.OnSubscribe&amp;lt;String&amp;gt;() {
             @Override
@@ -237,8 +241,9 @@
 
 &lt;p&gt;&lt;img src=&#34;http://fmitachi.github.io/images/4.png&#34; alt=&#34;流程4&#34; /&gt;&lt;/p&gt;
 
-&lt;p&gt;##4.异步##
-搞定了operator和lift之后，再来看线程调度就比较简单了，RxJava中的线程调度主要依赖于Scheduler完成。那如何将指定的operator放到特定的线程池中执行呢？RxJava提供两种方式：&lt;strong&gt;observerOn&lt;/strong&gt;和&lt;strong&gt;subscribeOn&lt;/strong&gt;,先看observerOn。&lt;/p&gt;
+&lt;h2 id=&#34;4-异步:b9472339406d06d16f9e17bdab169b30&#34;&gt;4.异步&lt;/h2&gt;
+
+&lt;p&gt;搞定了operator和lift之后，再来看线程调度就比较简单了，RxJava中的线程调度主要依赖于Scheduler完成。那如何将指定的operator放到特定的线程池中执行呢？RxJava提供两种方式：&lt;strong&gt;observerOn&lt;/strong&gt;和&lt;strong&gt;subscribeOn&lt;/strong&gt;,先看observerOn。&lt;/p&gt;
 
 &lt;pre&gt;&lt;code class=&#34;language-java&#34;&gt;    public final Observable&amp;lt;T&amp;gt; observeOn(Scheduler scheduler) {
         if (this instanceof ScalarSynchronousObservable) {
@@ -507,18 +512,24 @@
 
 &lt;p&gt;对比两种方式的执行流程，observerOn在切换线程之前所有的订阅行为已经发生，在执行&lt;strong&gt;Chain&lt;/strong&gt;的过程中切换线程，subscribeOn则是切换线程后发生对OB的订阅从而进入&lt;strong&gt;Chain&lt;/strong&gt;。所以对于observerOn每执行一次，其后续的Chain切换到另一条线程上执行，但是由于订阅行为已经发生，故其无法指定OB的执行线程;而对于后者，由于其线程切换发生在OB的订阅执行之前，所以其可以指定给OB指定线程，但是无论调用多少次，只有第一次会生效。&lt;/p&gt;
 
-&lt;p&gt;##5.结语##
-本文只是对RxJava源码的匆匆一瞥，在实际的项目应用中，可以根据自己的需求选择一些封装库，RxBinding等,另外还有诸如flatMap、contactMap、Subject以及剩余几种Scheduler的原理，大家可以自行分析源码。&lt;/p&gt;
+&lt;h2 id=&#34;5-结语:b9472339406d06d16f9e17bdab169b30&#34;&gt;5.结语&lt;/h2&gt;
+
+&lt;p&gt;本文只是对RxJava源码的匆匆一瞥，在实际的项目应用中，可以根据自己的需求选择一些封装库，RxBinding等,另外还有诸如flatMap、contactMap、Subject以及剩余几种Scheduler的原理，大家可以自行分析源码。&lt;/p&gt;
 </description>
     </item>
     
     <item>
-      <title>about</title>
+      <title>About Me</title>
       <link>http://fmitachi.github.io/about.html</link>
       <pubDate>Wed, 16 Mar 2016 15:53:55 +0800</pubDate>
       
       <guid>http://fmitachi.github.io/about.html</guid>
-      <description></description>
+      <description>
+
+&lt;h2 id=&#34;联系方式:6083a88ee3411b0d17ce02d738f69d47&#34;&gt;联系方式&lt;/h2&gt;
+
+&lt;p&gt;Email: &lt;a href=&#34;mailto:itachilord@163.com&#34;&gt;itachilord@163.com&lt;/a&gt;&lt;/p&gt;
+</description>
     </item>
     
   </channel>
