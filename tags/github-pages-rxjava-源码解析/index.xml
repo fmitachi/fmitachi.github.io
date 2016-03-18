@@ -1,0 +1,522 @@
+<?xml version="1.0" encoding="utf-8" standalone="yes" ?>
+<rss version="2.0" xmlns:atom="http://www.w3.org/2005/Atom">
+  <channel>
+    <title>Github Pages Rxjava 源码解析 on itachi</title>
+    <link>http://fmitachi.github.io/tags/github-pages-rxjava-%E6%BA%90%E7%A0%81%E8%A7%A3%E6%9E%90/</link>
+    <description>Recent content in Github Pages Rxjava 源码解析 on itachi</description>
+    <generator>Hugo -- gohugo.io</generator>
+    <language>zh-cn</language>
+    <lastBuildDate>Wed, 16 Mar 2016 15:54:44 +0800</lastBuildDate>
+    <atom:link href="http://fmitachi.github.io/tags/github-pages-rxjava-%E6%BA%90%E7%A0%81%E8%A7%A3%E6%9E%90/index.xml" rel="self" type="application/rss+xml" />
+    
+    <item>
+      <title>RxJava源码解析</title>
+      <link>http://fmitachi.github.io/2015-11-02-RxJava-Note/</link>
+      <pubDate>Wed, 16 Mar 2016 15:54:44 +0800</pubDate>
+      
+      <guid>http://fmitachi.github.io/2015-11-02-RxJava-Note/</guid>
+      <description>
+
+&lt;p&gt;最近项目中准备引入RxJava库，研究了一下源码，目前还没有正式投入使用，文中如有纰漏的地方，欢迎各位大神指正。&lt;/p&gt;
+
+&lt;h2 id=&#34;1-概念:b9472339406d06d16f9e17bdab169b30&#34;&gt;1.概念&lt;/h2&gt;
+
+&lt;p&gt;本文中会涉及到一些自定义的概念，先列在前面。&lt;/p&gt;
+
+&lt;p&gt;Observable: 可被订阅者（缩写OB）&lt;/p&gt;
+
+&lt;p&gt;Subscriber: 订阅者（缩写SUB）&lt;/p&gt;
+
+&lt;p&gt;订阅: Observable.subscribe函数或者类似于该函数的行为。&lt;/p&gt;
+
+&lt;p&gt;Chain:  Observable被触发之后的代码逻辑执行路径。&lt;/p&gt;
+
+&lt;p&gt;操作: Observable被触发之后到订阅者处理之前所经历的变换（lift）。&lt;/p&gt;
+
+&lt;h2 id=&#34;2-订阅者vs被订阅者:b9472339406d06d16f9e17bdab169b30&#34;&gt;2.订阅者VS被订阅者&lt;/h2&gt;
+
+&lt;p&gt;订阅者和被订阅者属于观察者模式中的两大核心概念，被订阅者产生事件，订阅者处理事件，事件的触发往往由第三方完成。在RxJava中两者不在局限于狭义的事件，其处理的可以使任何一段代码逻辑，触发&amp;rdquo;事件&amp;rdquo;的行为往往由&lt;strong&gt;订阅&lt;/strong&gt;完成。&lt;/p&gt;
+
+&lt;p&gt;那么RxJava中如何创建Observable和Subscriber呢？先上代码:&lt;/p&gt;
+
+&lt;pre&gt;&lt;code class=&#34;language-java&#34;&gt;Observable.create(new Observable.OnSubscribe&amp;lt;String&amp;gt;() {
+    @Override
+    public void call(Subscriber&amp;lt;? super String&amp;gt; subscriber) {
+        subscriber.onNext(&amp;quot;HelloWorld&amp;quot;);
+        subscriber.onCompleted();
+    }
+});
+&lt;/code&gt;&lt;/pre&gt;
+
+&lt;p&gt;在上面的代码中，创建了一个&lt;strong&gt;可被订阅者&lt;/strong&gt;，其执行的逻辑是向其订阅者传递一个&amp;rdquo;HelloWorld&amp;rdquo;字符串。那继续看Observable.create的源码:&lt;/p&gt;
+
+&lt;pre&gt;&lt;code class=&#34;language-java&#34;&gt;public final static &amp;lt;T&amp;gt; Observable&amp;lt;T&amp;gt; create(OnSubscribe&amp;lt;T&amp;gt; f) {
+    return new Observable&amp;lt;T&amp;gt;(hook.onCreate(f));
+}
+&lt;/code&gt;&lt;/pre&gt;
+
+&lt;p&gt;create方法接受一个OnSubscribe类型的参数，顾名思义该参数表示当&lt;strong&gt;订阅&lt;/strong&gt;行为发生时执行的操作，返回一个Observable对象。&lt;/p&gt;
+
+&lt;p&gt;*hook:用于对&lt;strong&gt;被订阅者&lt;/strong&gt;的生命周期进行拦截处理，默认hook不进行任何处理，代码详见RxJavaObservableExecutionHookDefault.java*。&lt;/p&gt;
+
+&lt;p&gt;继续看Observable的构造函数&lt;/p&gt;
+
+&lt;pre&gt;&lt;code class=&#34;language-java&#34;&gt;protected Observable(OnSubscribe&amp;lt;T&amp;gt; f) {
+    this.onSubscribe = f
+}
+&lt;/code&gt;&lt;/pre&gt;
+
+&lt;p&gt;在Observable的构造函数中，只是简单地存储了onSubscribe对象。至此一个&lt;strong&gt;可被订阅者&lt;/strong&gt;就创建完成了。有了Observable对象之后就可以开始&lt;strong&gt;订阅&lt;/strong&gt;行为了。&lt;/p&gt;
+
+&lt;pre&gt;&lt;code class=&#34;language-java&#34;&gt;Observable.create(new Observable.OnSubscribe&amp;lt;String&amp;gt;() {
+    @Override
+    public void call(Subscriber&amp;lt;? super String&amp;gt; subscriber) {
+        subscriber.onNext(&amp;quot;HelloWorld&amp;quot;);
+        subscriber.onCompleted();
+    }}).subscribe(new Subscriber&amp;lt;Object&amp;gt;() {
+    @Override
+    public void onCompleted() {}
+    @Override
+    public void onError(Throwable throwable) {}
+    @Override
+    public void onNext(Object o) {
+        System.out.println(o.toString());
+    }});
+&lt;/code&gt;&lt;/pre&gt;
+
+&lt;p&gt;当执行&lt;strong&gt;订阅&lt;/strong&gt;操作时，需要传递一个Subscriber对象，用于接收和处理Observable产生的&amp;rdquo;事件&amp;rdquo;。&lt;/p&gt;
+
+&lt;pre&gt;&lt;code class=&#34;language-java&#34;&gt;private static &amp;lt;T&amp;gt; Subscription subscribe(Subscriber&amp;lt;? super T&amp;gt; subscriber, Observable&amp;lt;T&amp;gt; observable) {
+    ...省略代码...
+    subscriber.onStart();
+    if (!(subscriber instanceof SafeSubscriber)) {
+        subscriber = new SafeSubscriber&amp;lt;T&amp;gt;(subscriber);
+    }
+    try {
+        hook.onSubscribeStart(observable, observable.onSubscribe).call(subscriber);
+        return hook.onSubscribeReturn(subscriber);
+    } catch (Throwable e) {
+        ...省略代码...
+        return Subscriptions.unsubscribed();
+    }
+}
+&lt;/code&gt;&lt;/pre&gt;
+
+&lt;p&gt;subscribe函数中会先调用onStart，然后转换为SafeSubscriber,作为参数传递给onSubscribe的call函数，并传递Subscriber对象，此处的onSubscribe即是create函数中new的onSubscribe，所以当其执行call函数时，自然调用到订阅者的onNext。&lt;/p&gt;
+
+&lt;p&gt;至此为止RxJava的一次简单使用已经完成，但是然并卵，这种特性和直接使用Callback并没有多大差别，那么RxJava的NB之处怎么体现呢？这就需要进入下一个主题，&lt;strong&gt;操作&lt;/strong&gt;&lt;/p&gt;
+
+&lt;h2 id=&#34;3-操作:b9472339406d06d16f9e17bdab169b30&#34;&gt;3.操作&lt;/h2&gt;
+
+&lt;p&gt;在上面的例子中Observer产生了一个Message（“HelloWorld”）,Subscriber对Message的处理方式就是把其打印出来，如果我们需要对Message进行加工怎么处理呢？这就需要用到神器&lt;strong&gt;map&lt;/strong&gt;。&lt;/p&gt;
+
+&lt;pre&gt;&lt;code class=&#34;language-java&#34;&gt;	Observable.create(new Observable.OnSubscribe&amp;lt;String&amp;gt;() {
+            @Override
+            public void call(Subscriber&amp;lt;? super String&amp;gt; subscriber) {
+                subscriber.onNext(&amp;quot;HelloWorld&amp;quot;);
+                subscriber.onCompleted();
+            }
+        }).map(new Func1&amp;lt;String, Object&amp;gt;() {
+            @Override
+            public Object call(String s) {
+                return new StringBuilder(s).reverse();
+            }
+        }).subscribe(new Subscriber&amp;lt;Object&amp;gt;() {
+            ...省略代码...
+        });
+&lt;/code&gt;&lt;/pre&gt;
+
+&lt;p&gt;那map函数做了哪些处理呢？&lt;/p&gt;
+
+&lt;pre&gt;&lt;code class=&#34;language-java&#34;&gt;    public final &amp;lt;R&amp;gt; Observable&amp;lt;R&amp;gt; map(Func1&amp;lt;? super T, ? extends R&amp;gt; func) {
+        return lift(new OperatorMap&amp;lt;T, R&amp;gt;(func));
+    }
+
+    public final &amp;lt;R&amp;gt; Observable&amp;lt;R&amp;gt; lift(final Operator&amp;lt;? extends R, ? super T&amp;gt; operator) {
+        return new Observable&amp;lt;R&amp;gt;(new OnSubscribe&amp;lt;R&amp;gt;() {
+            @Override
+            public void call(Subscriber&amp;lt;? super R&amp;gt; o) {
+                try {
+                    Subscriber&amp;lt;? super T&amp;gt; st = hook.onLift(operator).call(o);
+                    try {
+                        st.onStart();
+                        onSubscribe.call(st);
+                    } catch (Throwable e) {
+                        if (e instanceof OnErrorNotImplementedException) {
+                            throw (OnErrorNotImplementedException) e;
+                        }
+                        st.onError(e);
+                    }
+                } catch (Throwable e) {
+                    if (e instanceof OnErrorNotImplementedException) {
+                        throw (OnErrorNotImplementedException) e;
+                    }
+                    o.onError(e);
+                }
+            }
+        });
+    }
+&lt;/code&gt;&lt;/pre&gt;
+
+&lt;p&gt;此处出现了RxJava中比较核心的一个概念，lift, 其返回了一个新的Observable对象，为方便区分, 新的Observable对象称之为OB’， create接口返回的Observable对象命名为OB，也就意味着，我们最终的订阅者是订阅OB‘的，按之前的理解，当subscribe行为发生时，会触发执行Observable.onSubscribe的call函数，即上面代码中的call函数。&lt;strong&gt;&lt;em&gt;注意此处的call中的参数o，是我们在subscribe函数中创建的Subscriber对象(命名为SUB)&lt;/em&gt;&lt;/strong&gt;上面的代码中先调用operator的call函数，传递SUB获取一个新的Subscriber对象SUB’，那SUB‘和SUB是啥关系呢？我们先看Operator的类型，在map函数中，先用我们创建的转换函数Func1构建了OperatorMap,然后调用lift，此处的operator的实际类型为OperatorMap,所以我们的目标转移到OperatorMap的call函数。&lt;/p&gt;
+
+&lt;pre&gt;&lt;code class=&#34;language-java&#34;&gt;public final class OperatorMap&amp;lt;T, R&amp;gt; implements Operator&amp;lt;R, T&amp;gt; {
+
+    private final Func1&amp;lt;? super T, ? extends R&amp;gt; transformer;
+
+    public OperatorMap(Func1&amp;lt;? super T, ? extends R&amp;gt; transformer) {
+        this.transformer = transformer;
+    }
+
+    @Override
+    public Subscriber&amp;lt;? super T&amp;gt; call(final Subscriber&amp;lt;? super R&amp;gt; o) {
+        return new Subscriber&amp;lt;T&amp;gt;(o) {
+
+            @Override
+            public void onCompleted() {
+                o.onCompleted();
+            }
+
+            @Override
+            public void onError(Throwable e) {
+                o.onError(e);
+            }
+
+            @Override
+            public void onNext(T t) {
+                try {
+                    o.onNext(transformer.call(t));
+                } catch (Throwable e) {
+                    Exceptions.throwIfFatal(e);
+                    onError(OnErrorThrowable.addValueAsLastCause(e, t));
+                }
+            }
+
+        };
+    }
+
+}
+&lt;/code&gt;&lt;/pre&gt;
+
+&lt;p&gt;&lt;strong&gt;&lt;em&gt;注意此处创建了SUB’，当SUB‘被通知时（onNext被调用），先调用转换函数Func1进行处理，然后将处理的结果通知给SUB。&lt;/em&gt;&lt;/strong&gt;&lt;/p&gt;
+
+&lt;p&gt;回到lift的代码中，获取SUB’之后，调用OB的onSubscribe的call函数，并传递了SUB‘。对比subscribe函数，此处即触发了对OB的一次“订阅行为”，即用SUB’订阅OB。综上，最终的执行路线如下:&lt;/p&gt;
+
+&lt;p&gt;&lt;img src=&#34;http://fmitachi.github.io/images/1.png&#34; alt=&#34;流程1&#34; /&gt;&lt;/p&gt;
+
+&lt;p&gt;不带操作的订阅流程&lt;/p&gt;
+
+&lt;p&gt;&lt;img src=&#34;http://fmitachi.github.io/images/2.png&#34; alt=&#34;流程2&#34; /&gt;&lt;/p&gt;
+
+&lt;p&gt;使用map之后的执行流程&lt;/p&gt;
+
+&lt;p&gt;&lt;img src=&#34;http://fmitachi.github.io/images/3.png&#34; alt=&#34;流程3&#34; /&gt;&lt;/p&gt;
+
+&lt;p&gt;即map操作生成了一对代理OBProxy/SUBProxy,OBProxy用于接受真正的订阅，SUBProxy用于监听原本被观察者的事件。
+下面我们扩展到两个map的情况，每一次map操作会产生一个新的OB和新的SUB。&lt;/p&gt;
+
+&lt;pre&gt;&lt;code class=&#34;language-java&#34;&gt;	Observable.create(new Observable.OnSubscribe&amp;lt;String&amp;gt;() {
+            @Override
+            public void call(Subscriber&amp;lt;? super String&amp;gt; subscriber) {
+                subscriber.onNext(&amp;quot;HelloWorld&amp;quot;);
+                subscriber.onCompleted();
+            }
+        }).map(new Func1&amp;lt;String, Object&amp;gt;() {
+            @Override
+            public Object call(String s) {
+                return new StringBuilder(s).reverse();
+            }
+        }).map(new Func1&amp;lt;Object, Object&amp;gt;() {
+            @Override
+            public Object call(Object s) {
+                return new StringBuilder(s.toString()).reverse();
+            }
+        }).subscribe(new Subscriber&amp;lt;Object&amp;gt;() {
+            ...省略代码...
+        });
+
+&lt;/code&gt;&lt;/pre&gt;
+
+&lt;p&gt;其执行流程如下：&lt;/p&gt;
+
+&lt;p&gt;&lt;img src=&#34;http://fmitachi.github.io/images/4.png&#34; alt=&#34;流程4&#34; /&gt;&lt;/p&gt;
+
+&lt;h2 id=&#34;4-异步:b9472339406d06d16f9e17bdab169b30&#34;&gt;4.异步&lt;/h2&gt;
+
+&lt;p&gt;搞定了operator和lift之后，再来看线程调度就比较简单了，RxJava中的线程调度主要依赖于Scheduler完成。那如何将指定的operator放到特定的线程池中执行呢？RxJava提供两种方式：&lt;strong&gt;observerOn&lt;/strong&gt;和&lt;strong&gt;subscribeOn&lt;/strong&gt;,先看observerOn。&lt;/p&gt;
+
+&lt;pre&gt;&lt;code class=&#34;language-java&#34;&gt;    public final Observable&amp;lt;T&amp;gt; observeOn(Scheduler scheduler) {
+        if (this instanceof ScalarSynchronousObservable) {
+            return ((ScalarSynchronousObservable&amp;lt;T&amp;gt;)this).scalarScheduleOn(scheduler);
+        }
+        return lift(new OperatorObserveOn&amp;lt;T&amp;gt;(scheduler));
+    }
+&lt;/code&gt;&lt;/pre&gt;
+
+&lt;p&gt;其逻辑和普通的map操作一致，由此可知，线程调度相关的工作应由OperatorObserveOn.call返回的SUBProxy控制&lt;/p&gt;
+
+&lt;pre&gt;&lt;code class=&#34;language-java&#34;&gt;    public Subscriber&amp;lt;? super T&amp;gt; call(Subscriber&amp;lt;? super T&amp;gt; child) {
+        if (scheduler instanceof ImmediateScheduler) {
+            // avoid overhead, execute directly
+            return child;
+        } else if (scheduler instanceof TrampolineScheduler) {
+            // avoid overhead, execute directly
+            return child;
+        } else {
+            ObserveOnSubscriber&amp;lt;T&amp;gt; parent = new ObserveOnSubscriber&amp;lt;T&amp;gt;(scheduler, child);
+            parent.init();
+            return parent;
+        }
+    }
+&lt;/code&gt;&lt;/pre&gt;
+
+&lt;p&gt;此处返回的SUBProxy是ObserveOnSubscriber&lt;/p&gt;
+
+&lt;pre&gt;&lt;code class=&#34;language-java&#34;&gt;	 @Override
+        public void onNext(final T t) {
+            if (isUnsubscribed()) {
+                return;
+            }
+            if (!queue.offer(on.next(t))) {
+                onError(new MissingBackpressureException());
+                return;
+            }
+            schedule();
+        }
+&lt;/code&gt;&lt;/pre&gt;
+
+&lt;p&gt;在其onNext中果然发现了目标schedule函数。&lt;/p&gt;
+
+&lt;pre&gt;&lt;code class=&#34;language-java&#34;&gt;	protected void schedule() {
+            if (COUNTER_UPDATER.getAndIncrement(this) == 0) {
+                recursiveScheduler.schedule(action);
+            }
+        }
+&lt;/code&gt;&lt;/pre&gt;
+
+&lt;p&gt;schedule的任务又传递给了recursiveScheduler,这个是怎么乱入的，action又是干啥的？继续查看构造函数&lt;/p&gt;
+
+&lt;pre&gt;&lt;code class=&#34;language-java&#34;&gt;	public ObserveOnSubscriber(Scheduler scheduler, Subscriber&amp;lt;? super T&amp;gt; child) {
+            this.child = child;
+            this.recursiveScheduler = scheduler.createWorker();
+            if (UnsafeAccess.isUnsafeAvailable()) {
+                queue = new SpscArrayQueue&amp;lt;Object&amp;gt;(RxRingBuffer.SIZE);
+            } else {
+                queue = new SynchronizedQueue&amp;lt;Object&amp;gt;(RxRingBuffer.SIZE);
+            }
+            this.scheduledUnsubscribe = new ScheduledUnsubscribe(recursiveScheduler);
+        }
+&lt;/code&gt;&lt;/pre&gt;
+
+&lt;p&gt;&lt;strong&gt;&lt;em&gt;注意此处的child即为SUB&lt;/em&gt;&lt;/strong&gt;&lt;/p&gt;
+
+&lt;p&gt;recursiveScheduler是通过最外层选择的Scheduler创建出来的，so&amp;hellip;&lt;/p&gt;
+
+&lt;pre&gt;&lt;code class=&#34;language-java&#34;&gt;public final class NewThreadScheduler extends Scheduler {
+
+    private static final String THREAD_NAME_PREFIX = &amp;quot;RxNewThreadScheduler-&amp;quot;;
+    private static final RxThreadFactory THREAD_FACTORY = new RxThreadFactory(THREAD_NAME_PREFIX);
+    private static final NewThreadScheduler INSTANCE = new NewThreadScheduler();
+
+    /* package */static NewThreadScheduler instance() {
+        return INSTANCE;
+    }
+
+    private NewThreadScheduler() {
+
+    }
+
+    @Override
+    public Worker createWorker() {
+        return new NewThreadWorker(THREAD_FACTORY);
+    }
+}
+&lt;/code&gt;&lt;/pre&gt;
+
+&lt;p&gt;继续找NewThreadWorker.schedule最终会调用到scheduleActual&lt;/p&gt;
+
+&lt;pre&gt;&lt;code class=&#34;language-java&#34;&gt;    public ScheduledAction scheduleActual(final Action0 action, long delayTime, TimeUnit unit) {
+        Action0 decoratedAction = schedulersHook.onSchedule(action);
+        ScheduledAction run = new ScheduledAction(decoratedAction);
+        Future&amp;lt;?&amp;gt; f;
+        if (delayTime &amp;lt;= 0) {
+            f = executor.submit(run);
+        } else {
+            f = executor.schedule(run, delayTime, unit);
+        }
+        run.add(f);
+
+        return run;
+    }
+&lt;/code&gt;&lt;/pre&gt;
+
+&lt;p&gt;外层传递的action会被包装为ScheduledAction，提交Java的线程池给executor执行，在其run方法内会执行action的call函数。&lt;/p&gt;
+
+&lt;pre&gt;&lt;code class=&#34;language-java&#34;&gt;    final Action0 action = new Action0() {
+
+        @Override
+        public void call() {
+            pollQueue();
+        }
+
+    };
+
+    void pollQueue() {
+        int emitted = 0;
+        do {
+            
+            for (;;) {
+                ...省略代码...
+                if (r &amp;gt; 0) {
+                    Object o = queue.poll();
+                    if (o != null) {
+                        child.onNext(on.getValue(o));
+                        r--;
+                        emitted++;
+                        produced++;
+                    } else {
+                        break;
+                    }
+                } else {
+                    break;
+                }
+            }
+            ...省略代码...
+        } while (COUNTER_UPDATER.decrementAndGet(this) &amp;gt; 0);
+        if (emitted &amp;gt; 0) {
+            request(emitted);
+        }
+    }
+&lt;/code&gt;&lt;/pre&gt;
+
+&lt;p&gt;至此，又回到了SUB上，唯一的区别就是SUB.onNext是在线程池中执行，而非创建SUB的线程中执行。值得注意的是，一旦执行一次observerOn之后，后续的逻辑都是在Scheduler指定的线程上运行的，直到再次调用observerOn或则流程运行结束。&lt;/p&gt;
+
+&lt;p&gt;&lt;img src=&#34;http://fmitachi.github.io/images/5.png&#34; alt=&#34;流程5&#34; /&gt;&lt;/p&gt;
+
+&lt;p&gt;另外一种线程调度的方式是subscribeOn，那subscribeOn是 怎么执行的呢？它和observerOn有什么区别呢？
+继续上源码&lt;/p&gt;
+
+&lt;pre&gt;&lt;code class=&#34;language-java&#34;&gt;    public final Observable&amp;lt;T&amp;gt; subscribeOn(Scheduler scheduler) {
+        if (this instanceof ScalarSynchronousObservable) {
+            return ((ScalarSynchronousObservable&amp;lt;T&amp;gt;)this).scalarScheduleOn(scheduler);
+        }
+        return nest().lift(new OperatorSubscribeOn&amp;lt;T&amp;gt;(scheduler));
+    }
+&lt;/code&gt;&lt;/pre&gt;
+
+&lt;p&gt;和observerOn的代码很神似，但是注意有两处区别：&lt;strong&gt;nest&lt;/strong&gt;和&lt;strong&gt;OperatorSubscribeOn&lt;/strong&gt;&lt;/p&gt;
+
+&lt;pre&gt;&lt;code class=&#34;language-java&#34;&gt;    public final Observable&amp;lt;Observable&amp;lt;T&amp;gt;&amp;gt; nest() {
+        return just(this);
+    }
+
+    public final static &amp;lt;T&amp;gt; Observable&amp;lt;T&amp;gt; just(final T value) {
+        return ScalarSynchronousObservable.create(value);
+    }
+
+&lt;/code&gt;&lt;/pre&gt;
+
+&lt;p&gt;同样nest创建了一个OB‘,只是其类型是ScalarSynchronousObservable，并且把OB作为参数传递给构造函数&lt;/p&gt;
+
+&lt;pre&gt;&lt;code class=&#34;language-java&#34;&gt;    protected ScalarSynchronousObservable(final T t) {
+        super(new OnSubscribe&amp;lt;T&amp;gt;() {
+
+            @Override
+            public void call(Subscriber&amp;lt;? super T&amp;gt; s) {
+                s.onNext(t);
+                s.onCompleted();
+            }
+
+        });
+        this.t = t;
+    }
+&lt;/code&gt;&lt;/pre&gt;
+
+&lt;p&gt;在ScalarSynchronousObservable中创建了OB’,当OB‘&lt;strong&gt;被订阅&lt;/strong&gt;的时候，把OB作为参数传递给了OB’的订阅者，那OB‘的订阅者是谁呢？会是外层创建的SUB么？答案是否定的，因为SUB的onNext不能接受Observable类型的参数。回顾之前lift函数中会产生一次订阅操作，那么此处的订阅者应该是lift中从operator获取的SUB’，那OperatorSubscribeOn会生成一个怎样的订阅者呢？&lt;/p&gt;
+
+&lt;pre&gt;&lt;code class=&#34;language-java&#34;&gt;public Subscriber&amp;lt;? super Observable&amp;lt;T&amp;gt;&amp;gt; call(final Subscriber&amp;lt;? super T&amp;gt; subscriber) {
+        final Worker inner = scheduler.createWorker();
+        subscriber.add(inner);
+        return new Subscriber&amp;lt;Observable&amp;lt;T&amp;gt;&amp;gt;(subscriber) {
+
+            @Override
+            public void onCompleted() {
+                // ignore because this is a nested Observable and we expect only 1 Observable&amp;lt;T&amp;gt; emitted to onNext
+            }
+
+            @Override
+            public void onError(Throwable e) {
+                subscriber.onError(e);
+            }
+
+            @Override
+            public void onNext(final Observable&amp;lt;T&amp;gt; o) {
+                inner.schedule(new Action0() {
+
+                    @Override
+                    public void call() {
+                        final Thread t = Thread.currentThread();
+                        o.unsafeSubscribe(new Subscriber&amp;lt;T&amp;gt;(subscriber) {
+
+                            @Override
+                            public void onCompleted() {
+                                subscriber.onCompleted();
+                            }
+
+                            @Override
+                            public void onError(Throwable e) {
+                                subscriber.onError(e);
+                            }
+
+                            @Override
+                            public void onNext(T t) {
+                                subscriber.onNext(t);
+                            }
+
+                            @Override
+                            public void setProducer(final Producer producer) {
+                                subscriber.setProducer(new Producer() {
+
+                                    @Override
+                                    public void request(final long n) {
+                                        if (Thread.currentThread() == t) {
+                                            // don&#39;t schedule if we&#39;re already on the thread (primarily for first setProducer call)
+                                            // see unit test &#39;testSetProducerSynchronousRequest&#39; for more context on this
+                                            producer.request(n);
+                                        } else {
+                                            inner.schedule(new Action0() {
+
+                                                @Override
+                                                public void call() {
+                                                    producer.request(n);
+                                                }
+                                            });
+                                        }
+                                    }
+
+                                });
+                            }
+
+                        });
+                    }
+                });
+            }
+
+        };
+    }
+&lt;/code&gt;&lt;/pre&gt;
+
+&lt;p&gt;注意SUB‘的onNext函数，会先执行线程切换，然后对OB进行订阅操作，并在其订阅者的onNext中把结果传递给SUB，从而回到&lt;strong&gt;Chain&lt;/strong&gt;上。综上，执行流程为：&lt;/p&gt;
+
+&lt;p&gt;&lt;img src=&#34;http://fmitachi.github.io/images/6.png&#34; alt=&#34;流程6&#34; /&gt;&lt;/p&gt;
+
+&lt;p&gt;对比两种方式的执行流程，observerOn在切换线程之前所有的订阅行为已经发生，在执行&lt;strong&gt;Chain&lt;/strong&gt;的过程中切换线程，subscribeOn则是切换线程后发生对OB的订阅从而进入&lt;strong&gt;Chain&lt;/strong&gt;。所以对于observerOn每执行一次，其后续的Chain切换到另一条线程上执行，但是由于订阅行为已经发生，故其无法指定OB的执行线程;而对于后者，由于其线程切换发生在OB的订阅执行之前，所以其可以指定给OB指定线程，但是无论调用多少次，只有第一次会生效。&lt;/p&gt;
+
+&lt;h2 id=&#34;5-结语:b9472339406d06d16f9e17bdab169b30&#34;&gt;5.结语&lt;/h2&gt;
+
+&lt;p&gt;本文只是对RxJava源码的匆匆一瞥，在实际的项目应用中，可以根据自己的需求选择一些封装库，RxBinding等,另外还有诸如flatMap、contactMap、Subject以及剩余几种Scheduler的原理，大家可以自行分析源码。&lt;/p&gt;
+</description>
+    </item>
+    
+  </channel>
+</rss>
