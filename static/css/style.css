@@ -1181,7 +1181,6 @@ body>footer p {
 
 	#social {
 		position: absolute;
-		bottom: 2em;
 		left: 5%;
 		width: 90%
 	}
@@ -1269,8 +1268,8 @@ body>footer p {
 	}
 
 	#header nav .social li {
-		margin: 0 -2px 0 -2px;
-		width: 49%!important
+		margin: 1em -2px 1em -2px;
+		width: 100%!important
 	}
 
 	#comments,body>.content,body>aside,body>footer,body>section {

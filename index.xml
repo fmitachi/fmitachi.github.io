@@ -11,10 +11,10 @@
     
     <item>
       <title>RxJava源码解析</title>
-      <link>http://fmitachi.github.io/2015-11-02-RxJava-Note.html</link>
+      <link>http://fmitachi.github.io/2015-11-02-RxJava-Note/</link>
       <pubDate>Wed, 16 Mar 2016 15:54:44 +0800</pubDate>
       
-      <guid>http://fmitachi.github.io/2015-11-02-RxJava-Note.html</guid>
+      <guid>http://fmitachi.github.io/2015-11-02-RxJava-Note/</guid>
       <description>
 
 &lt;p&gt;最近项目中准备引入RxJava库，研究了一下源码，目前还没有正式投入使用，文中如有纰漏的地方，欢迎各位大神指正。&lt;/p&gt;
@@ -520,10 +520,10 @@
     
     <item>
       <title>About Me</title>
-      <link>http://fmitachi.github.io/about.html</link>
+      <link>http://fmitachi.github.io/about/</link>
       <pubDate>Wed, 16 Mar 2016 15:53:55 +0800</pubDate>
       
-      <guid>http://fmitachi.github.io/about.html</guid>
+      <guid>http://fmitachi.github.io/about/</guid>
       <description>
 
 &lt;h2 id=&#34;联系方式:6083a88ee3411b0d17ce02d738f69d47&#34;&gt;联系方式&lt;/h2&gt;
